@@ -1,0 +1,16 @@
+[
+{
+  "modid": "authlibloginhelper",
+  "name": "AuthlibLoginHelper",
+  "description": "Open a GUI when connecting to server or LAN. ",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["ustc_zzzz"],
+  "credits": "Mojang AB, and the Forge and FML guys. ",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
