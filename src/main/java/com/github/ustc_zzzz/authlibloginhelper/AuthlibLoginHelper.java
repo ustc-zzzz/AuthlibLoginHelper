@@ -31,6 +31,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Proxy;
+import java.util.UUID;
 
 /**
  * @author ustc_zzzz
@@ -127,7 +128,8 @@ public class AuthlibLoginHelper
     public void onLogin(AuthlibLoginStartEvent event)
     {
         Data oldData = this.loadAccount(event.ip, event.port);
-        YggdrasilAuthenticationService s = new YggdrasilAuthenticationService(Proxy.NO_PROXY, "1");
+        String clientToken = UUIDTypeAdapter.fromUUID(UUID.randomUUID());
+        YggdrasilAuthenticationService s = new YggdrasilAuthenticationService(Proxy.NO_PROXY, clientToken);
         YggdrasilUserAuthentication auth = (YggdrasilUserAuthentication) s.createUserAuthentication(Agent.MINECRAFT);
 
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -191,7 +193,7 @@ public class AuthlibLoginHelper
             catch (Exception e)
             {
                 e = e instanceof AuthenticationException ? e : new AuthenticationException("Login failed", e);
-                this.logger.error(e);
+                this.logger.error("AuthlibLoginHelper: Failed to connect " + event.ip + ':' + event.port, e);
             }
         }
     }
