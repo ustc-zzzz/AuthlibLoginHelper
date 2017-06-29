@@ -2,10 +2,13 @@ package com.github.ustc_zzzz.authlibloginhelper;
 
 import com.github.ustc_zzzz.authlibloginhelper.event.AuthlibLoginStartEvent;
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.authlib.Agent;
 import com.mojang.authlib.exceptions.AuthenticationException;
@@ -19,6 +22,7 @@ import net.minecraft.launchwrapper.Launch;
 import net.minecraft.util.Session;
 import net.minecraft.util.Tuple;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.client.event.ConfigChangedEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -31,36 +35,92 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Proxy;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * @author ustc_zzzz
  */
 @Mod(modid = "authlibloginhelper", name = "AuthlibLoginHelper", version = "@version@", clientSideOnly = true,
-        dependencies = "required-after:authlibloginhelpercore", acceptedMinecraftVersions = "1.10.2")
+        dependencies = "required-after:authlibloginhelpercore", acceptedMinecraftVersions = "1.10.2",
+        guiFactory = "com.github.ustc_zzzz.authlibloginhelper.AuthlibLoginHelperGuiFactory")
 public class AuthlibLoginHelper
 {
+    private static AuthlibLoginHelper instance;
+
     private File conf;
     private Logger logger;
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final String clientToken = Strings.repeat("f", 32); // magic number
 
-    private void saveAccount(String ip, int port, Data data)
+    public Map<String, Data> listAccounts()
     {
-        try (FileReader reader = new FileReader(this.conf); FileWriter writer = new FileWriter(this.conf))
+        try (FileReader reader = new FileReader(this.conf))
         {
-            JsonObject jsonObject = this.gson.fromJson(reader, JsonObject.class);
-            if (jsonObject == null)
+            ImmutableMap.Builder<String, Data> builder = ImmutableMap.builder();
+            JsonElement jsonObject = this.gson.fromJson(reader, JsonElement.class);
+            if (jsonObject == null || !jsonObject.isJsonObject())
             {
                 jsonObject = new JsonObject();
             }
-            JsonObject account = new JsonObject();
-            account.addProperty("user", data.userid);
-            account.addProperty("name", data.name.orNull());
-            account.addProperty("uuid", data.uuid.orNull());
-            account.addProperty("auth", data.accessToken.orNull());
-            jsonObject.add(ip + ':' + port, account);
-            this.gson.toJson(jsonObject, writer);
+            for (Map.Entry<String, JsonElement> entry : jsonObject.getAsJsonObject().entrySet())
+            {
+                JsonObject account = entry.getValue().getAsJsonObject();
+                String userid = account.has("user") ? account.get("user").getAsString() : "";
+                if (!account.has("name") || !account.has("uuid") || !account.has("auth"))
+                {
+                    builder.put(entry.getKey(), new Data(userid));
+                }
+                else
+                {
+                    String name = account.get("name").getAsString();
+                    String uuid = account.get("uuid").getAsString();
+                    String accessToken = account.get("auth").getAsString();
+                    builder.put(entry.getKey(), new Data(userid, name, uuid, accessToken));
+                }
+            }
+            return builder.build();
+        }
+        catch (IOException e)
+        {
+            String path = this.conf.getAbsolutePath();
+            this.logger.info("AuthlibLoginHelper: Find error when saving account to " + path, e);
+            return ImmutableMap.of();
+        }
+    }
+
+    public void saveAccount(String address, Data data)
+    {
+        try
+        {
+            JsonElement jsonObject;
+            try (FileReader reader = new FileReader(this.conf))
+            {
+                jsonObject = this.gson.fromJson(reader, JsonElement.class);
+                if (jsonObject == null || !jsonObject.isJsonObject())
+                {
+                    jsonObject = new JsonObject();
+                }
+                if (data.userid.isEmpty() && data.accessToken.isPresent())
+                {
+                    jsonObject.getAsJsonObject().remove(address);
+                }
+                else
+                {
+                    JsonObject account = new JsonObject();
+                    account.addProperty("user", data.userid);
+                    account.addProperty("name", data.name.orNull());
+                    account.addProperty("uuid", data.uuid.orNull());
+                    account.addProperty("auth", data.accessToken.orNull());
+                    jsonObject.getAsJsonObject().add(address, account);
+                }
+            }
+            try (FileWriter writer = new FileWriter(this.conf))
+            {
+                this.gson.toJson(jsonObject, writer);
+            }
         }
         catch (IOException e)
         {
@@ -69,14 +129,14 @@ public class AuthlibLoginHelper
         }
     }
 
-    private Data loadAccount(String ip, int port)
+    public Data loadAccount(String address)
     {
         try (FileReader reader = new FileReader(this.conf))
         {
-            JsonObject jsonObject = this.gson.fromJson(reader, JsonObject.class);
-            if (jsonObject != null && jsonObject.has(ip + ':' + port))
+            JsonElement jsonObject = this.gson.fromJson(reader, JsonElement.class);
+            if (jsonObject != null && jsonObject.isJsonObject() && jsonObject.getAsJsonObject().has(address))
             {
-                JsonObject account = jsonObject.getAsJsonObject(ip + ':' + port);
+                JsonObject account = jsonObject.getAsJsonObject().getAsJsonObject(address);
                 String userid = account.has("user") ? account.get("user").getAsString() : "";
                 if (account.has("name") && account.has("uuid") && account.has("auth"))
                 {
@@ -108,6 +168,7 @@ public class AuthlibLoginHelper
     {
         try
         {
+            instance = this;
             this.logger = event.getModLog();
             this.conf = new File(Launch.minecraftHome, "authlibloginhelper-accounts.json");
             if (this.conf.createNewFile())
@@ -125,11 +186,20 @@ public class AuthlibLoginHelper
 
     @SubscribeEvent
     @SideOnly(Side.CLIENT)
+    public void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event)
+    {
+        if ("authlibloginhelper".equals(event.getModID()))
+        {
+            AuthlibLoginHelperGuiFactory.Config.onConfigApplied();
+        }
+    }
+
+    @SubscribeEvent
+    @SideOnly(Side.CLIENT)
     public void onLogin(AuthlibLoginStartEvent event)
     {
-        Data oldData = this.loadAccount(event.ip, event.port);
-        String clientToken = UUIDTypeAdapter.fromUUID(UUID.randomUUID());
-        YggdrasilAuthenticationService s = new YggdrasilAuthenticationService(Proxy.NO_PROXY, clientToken);
+        Data oldData = this.loadAccount(event.ip + ':' + event.port);
+        YggdrasilAuthenticationService s = new YggdrasilAuthenticationService(Proxy.NO_PROXY, this.clientToken);
         YggdrasilUserAuthentication auth = (YggdrasilUserAuthentication) s.createUserAuthentication(Agent.MINECRAFT);
 
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -143,17 +213,19 @@ public class AuthlibLoginHelper
                 if (!userid.isEmpty())
                 {
                     auth.loadFromStorage(ImmutableMap.<String, Object>of("accessToken", oldData.accessToken.get()));
+                    auth.setUsername(userid);
                     auth.logIn();
                     session.username = oldData.name.orNull();
                     session.playerID = oldData.uuid.orNull();
                     session.token = auth.getAuthenticatedToken();
                     Data newData = new Data(userid, session.username, session.playerID, session.token);
-                    this.saveAccount(event.ip, event.port, newData);
+                    this.saveAccount(event.ip + ':' + event.port, newData);
                     return;
                 }
             }
             catch (AuthenticationException e)
             {
+                this.logger.debug("AuthlibLoginHelper: Failed to login with access token", e);
                 this.logger.info("AuthlibLoginHelper: Failed to login with access token, try to login with password");
                 auth.logOut();
             }
@@ -177,7 +249,7 @@ public class AuthlibLoginHelper
                     userid = result.getFirst();
                     if (userid.isEmpty())
                     {
-                        this.saveAccount(event.ip, event.port, new Data(userid));
+                        this.saveAccount(event.ip + ':' + event.port, new Data(userid));
                         return;
                     }
                     auth.setUsername(userid);
@@ -187,7 +259,7 @@ public class AuthlibLoginHelper
                     session.playerID = UUIDTypeAdapter.fromUUID(auth.getSelectedProfile().getId());
                     session.token = auth.getAuthenticatedToken();
                     Data newData = new Data(userid, session.username, session.playerID, session.token);
-                    this.saveAccount(event.ip, event.port, newData);
+                    this.saveAccount(event.ip + ':' + event.port, newData);
                 }
             }
             catch (Exception e)
@@ -198,14 +270,24 @@ public class AuthlibLoginHelper
         }
     }
 
-    private static class Data
+    public static AuthlibLoginHelper getInstance()
     {
-        private final String userid;
-        private final Optional<String> name;
-        private final Optional<String> uuid;
-        private final Optional<String> accessToken;
+        return instance;
+    }
 
-        private Data(String userid, String name, String uuid, String accessToken)
+    // (user, name, uuid, auth) match {
+    //   case ("", _, _, null) => skip
+    //   case ("", _, _, _) => login with username and password
+    //   case (_, _, _, _) => login with access token, and with username and password if the token does not work
+    // }
+    public static class Data
+    {
+        public final String userid;
+        public final Optional<String> name;
+        public final Optional<String> uuid;
+        public final Optional<String> accessToken;
+
+        public Data(String userid, String name, String uuid, String accessToken)
         {
             this.userid = userid;
             this.name = Optional.of(name);
@@ -213,7 +295,7 @@ public class AuthlibLoginHelper
             this.accessToken = Optional.of(accessToken);
         }
 
-        private Data(String userid)
+        public Data(String userid)
         {
             this.userid = userid;
             this.name = Optional.absent();

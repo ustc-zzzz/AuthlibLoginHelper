@@ -2,6 +2,10 @@
 gui.authlibloginhelper.ok=OK
 gui.authlibloginhelper.no=Cancel
 gui.authlibloginhelper.skip=Skip
+gui.authlibloginhelper.login=Login
+
+gui.authlibloginhelper.skip.tooltip=When the player wants to join the server, the login process will be skipped and the player will join in directly. It is usually used for offline servers.
+gui.authlibloginhelper.login.tooltip=When the player wants to join the server, username and password are required for login. It has the same behavior as the server had never been joined before.
 
 gui.authlibloginhelper.username=Username
 gui.authlibloginhelper.password=Password
