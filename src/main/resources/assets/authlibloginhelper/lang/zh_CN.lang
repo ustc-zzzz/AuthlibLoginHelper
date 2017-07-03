@@ -3,6 +3,7 @@ gui.authlibloginhelper.ok=确定
 gui.authlibloginhelper.no=取消
 gui.authlibloginhelper.skip=跳过
 gui.authlibloginhelper.login=登录
+gui.authlibloginhelper.forget=忘记
 
 gui.authlibloginhelper.skip.tooltip=当玩家试图加入服务器时，游戏将跳过登录过程，让玩家直接加入服务器。这通常用于未开启正版验证的服务器。
 gui.authlibloginhelper.login.tooltip=当玩家试图加入服务器时，玩家需要输入用户名和密码。这和玩家试图加入一个从未加入的服务器时的行为是一致的。
