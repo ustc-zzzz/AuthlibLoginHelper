@@ -41,11 +41,15 @@ public class AuthlibLoginHelperGui extends GuiScreen
     @Override
     public void initGui()
     {
-        this.noButton = new GuiButton(-1, this.width / 2 + 51, 140, 50, 20, I18n.format("gui.authlibloginhelper.no"));
-        this.skipButton = new GuiButton(0, this.width / 2 - 9, 140, 50, 20, I18n.format("gui.authlibloginhelper.skip"));
-        this.okButton = new GuiButton(1, this.width / 2 - 69, 140, 50, 20, I18n.format("gui.authlibloginhelper.ok"));
-        this.usernameField = new GuiTextField(2, this.mc.fontRendererObj, this.width / 2 - 100, 60, 200, 20);
-        this.passwordField = new GuiTextField(3, this.mc.fontRendererObj, this.width / 2 - 100, 100, 200, 20)
+        int offsetX = this.width / 2, offsetY = this.height / 2;
+        String noButtonText = I18n.format("gui.authlibloginhelper.no");
+        String skipButtonText = I18n.format("gui.authlibloginhelper.skip");
+        String okButtonText = I18n.format("gui.authlibloginhelper.ok");
+        this.noButton = new GuiButton(-1, offsetX + 51, offsetY + 30, 50, 20, noButtonText);
+        this.skipButton = new GuiButton(0, offsetX - 9, offsetY + 30, 50, 20, skipButtonText);
+        this.okButton = new GuiButton(1, offsetX - 69, offsetY + 30, 50, 20, okButtonText);
+        this.usernameField = new GuiTextField(2, this.mc.fontRendererObj, offsetX - 100, offsetY - 50, 200, 20);
+        this.passwordField = new GuiTextField(3, this.mc.fontRendererObj, offsetX - 100, offsetY - 10, 200, 20)
         {
             @Override
             public synchronized void drawTextBox()
@@ -134,10 +138,11 @@ public class AuthlibLoginHelperGui extends GuiScreen
         {
             this.usernameField.drawTextBox();
             this.passwordField.drawTextBox();
+            int offsetX = this.width / 2, offsetY = this.height / 2;
             String usernameText = I18n.format("gui.authlibloginhelper.username");
             String passwordText = I18n.format("gui.authlibloginhelper.password");
-            this.drawString(this.fontRendererObj, usernameText, this.width / 2 - 100, 48, 0x00A0A0A0);
-            this.drawString(this.fontRendererObj, passwordText, this.width / 2 - 100, 88, 0x00A0A0A0);
+            this.drawString(this.fontRendererObj, usernameText, offsetX - 100, offsetY - 62, 0x00A0A0A0);
+            this.drawString(this.fontRendererObj, passwordText, offsetX - 100, offsetY - 22, 0x00A0A0A0);
             super.drawScreen(mouseX, mouseY, partialTicks);
         }
     }
